@@ -4,7 +4,7 @@
 Configuration Management for [Heka](http://hekad.readthedocs.io/en/latest/)....using [Heka](http://hekad.readthedocs.io/en/latest/)
 
 Occasionally there are circumstances where it may not always be possible to leverage the existing configuration management service(assuming there is one) for the environment in which you have deployed Heka.
-In this scenario it may be useful to be able to deliver and deploy new configurations using the Heka daemon itself.
+In this scenario it may be useful to have the ability to deliver and deploy new configurations using the Heka daemon itself.
 
 One of Heka's Input types is the
 [ProcessDirectoryInput](https://hekad.readthedocs.io/en/latest/config/inputs/processdir.html).
@@ -13,7 +13,7 @@ That input scans a specified directory at a set interval for another Heka input 
 
 Expanding on this model we can introduce similar new input types(i.e. LogstreamerDirectoryInput) to monitor locations for their own updates.
 
-All we need is a way to manage the config files each DirectoryInput loads.
+All we need is a way to manage the config files each *DirectoryInput and they will be automatically loaded into the running daemon.
 
 CMFilter
 ===========
