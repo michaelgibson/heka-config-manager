@@ -24,7 +24,7 @@ This filter provides the following functionality:
 - Removes specified config files
 
 It will expect the incoming Heka message to have one or more of the following Fields set:
-- Fields[Action](string, required)
+- `Fields[Action]`(string, required)  
 	Value must be one of:
 	-	"add": Add new or update existing config file.
 		Fields["Overwrite"]: (string, optional) - Indicates whether to overwrite an existing config file or fail. Duplication is determined based on name of plugin. Defaults to "false"
