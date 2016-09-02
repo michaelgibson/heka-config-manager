@@ -11,7 +11,7 @@ Currently supports:
 [ProcessDirectoryInput](http://hekad.readthedocs.io/en/latest/config/inputs/processdir.html)  
 [LogstreamerDirectoryInput](https://github.com/michaelgibson/heka-logstreamer-directory-input)  
 
-These plugin types are designed to monitor a directory structure for changes and either dynamically load or unload files based on changes.
+These plugin types are designed to monitor their respective directory structures for changes and dynamically load or unload config files based on changes.
 
 CMFilter
 ===========
