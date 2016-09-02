@@ -7,9 +7,9 @@ Occasionally there are circumstances where it may not always be possible to leve
 In this scenario it may be useful to have the ability to deliver and deploy new configurations using the Heka daemon itself.
 The CMFilter is intended to be used in conjunction with one or more *DirectoryInput plugin types.
 
-Currently supports:
-http://hekad.readthedocs.io/en/latest/config/inputs/processdir.html
-https://github.com/michaelgibson/heka-logstreamer-directory-input
+Currently supports:  
+[ProcessDirectoryInput](http://hekad.readthedocs.io/en/latest/config/inputs/processdir.html)  
+[LogstreamerDirectoryInput](https://github.com/michaelgibson/heka-logstreamer-directory-input)  
 
 These plugin types are designed to monitor a directory structure for changes and either dynamically load or unload files based on changes.
 
