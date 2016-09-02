@@ -1,23 +1,21 @@
 package config_management
 
-
 import (
-				"bytes"
-				"crypto/rand"
-				"encoding/hex"
-        "fmt"
-				"io"
-				"io/ioutil"
-				"os"
-				"path/filepath"
-				"strconv"
-				"strings"
-				"sync"
-				"github.com/bbangert/toml"
-        "github.com/mozilla-services/heka/message"
-        . "github.com/mozilla-services/heka/pipeline"
-        "github.com/pborman/uuid"
-
+	"bytes"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
+	"github.com/bbangert/toml"
+	"github.com/mozilla-services/heka/message"
+	. "github.com/mozilla-services/heka/pipeline"
+	"github.com/pborman/uuid"
+	"io"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
 )
 
 const (
@@ -28,38 +26,38 @@ type CMBatch struct {
 	queueCursor string
 	count       int64
 	batch       []byte
-	confInfo		ConfigFileInfo
+	confInfo    ConfigFileInfo
 }
 
 type ConfigFileInfo struct {
-	confName			string
-	confType			string
-	confCategory	string
-	fileName		  string
-	overwrite			bool
-	status				string
-	ticker				int
+	confName     string
+	confType     string
+	confCategory string
+	fileName     string
+	overwrite    bool
+	status       string
+	ticker       int
 }
 
 type CMFilter struct {
-  *CMFilterConfig
-	count            int64
-	backChan         chan []byte
-	recvChan         chan MsgPack
-	batchChan        chan CMBatch // Chan to pass completed batches
-	outBatch         []byte
-	queueCursor      string
-	conf             *CMFilterConfig
-	fr               FilterRunner
-	outputBlock      *RetryHelper
-	reportLock       sync.Mutex
-	pConfig          *PipelineConfig
-	stopChan         chan bool
-	msgLoopCount 		 uint
-	msg 						 *message.Message
-	confInfo				 ConfigFileInfo
-	includePaths		 []string
-	shareDir				 string
+	*CMFilterConfig
+	count        int64
+	backChan     chan []byte
+	recvChan     chan MsgPack
+	batchChan    chan CMBatch // Chan to pass completed batches
+	outBatch     []byte
+	queueCursor  string
+	conf         *CMFilterConfig
+	fr           FilterRunner
+	outputBlock  *RetryHelper
+	reportLock   sync.Mutex
+	pConfig      *PipelineConfig
+	stopChan     chan bool
+	msgLoopCount uint
+	msg          *message.Message
+	confInfo     ConfigFileInfo
+	includePaths []string
+	shareDir     string
 }
 
 type CMFilterConfig struct {
@@ -67,37 +65,36 @@ type CMFilterConfig struct {
 	ExcludePaths []string `toml:"exclude_paths"`
 	IncludeTypes []string `toml:"include_types"`
 
-
 	//Used for ProcessDirectoryInputs
-	ProcessDir		 string 	`toml:"process_dir"`
-	LogstreamerDir string		`toml:"logstreamer_dir"`
+	ProcessDir     string `toml:"process_dir"`
+	LogstreamerDir string `toml:"logstreamer_dir"`
 
 	UseBuffering bool `toml:"use_buffering"`
 }
 
 type MsgPack struct {
-	bytes       []byte
-	Message			*message.Message
+	bytes        []byte
+	Message      *message.Message
 	MsgLoopCount uint
-	queueCursor string
+	queueCursor  string
 }
 
 func (f *CMFilter) ConfigStruct() interface{} {
-  return &CMFilterConfig{
-		CMTag: "CM",
+	return &CMFilterConfig{
+		CMTag:        "CM",
 		IncludeTypes: []string{"ProcessInput", "LogstreamerInput"},
-		UseBuffering:          true,
-  }
+		UseBuffering: true,
+	}
 }
 
 func (f *CMFilter) Init(config interface{}) (err error) {
-  f.conf = config.(*CMFilterConfig)
+	f.conf = config.(*CMFilterConfig)
 
 	f.batchChan = make(chan CMBatch)
 	f.backChan = make(chan []byte, 2)
 	f.recvChan = make(chan MsgPack, 100)
 
-  return
+	return
 }
 
 func (f *CMFilter) Prepare(fr FilterRunner, h PluginHelper) error {
@@ -139,7 +136,6 @@ func (f *CMFilter) ProcessMessage(pack *PipelinePack) error {
 		outBytes []byte
 	)
 
-
 	outBytes = []byte(pack.Message.GetPayload())
 
 	if outBytes != nil {
@@ -163,71 +159,71 @@ func (f *CMFilter) batchSender(h PluginHelper) {
 			f.msgLoopCount = pack.MsgLoopCount
 			action, _ := pack.Message.GetFieldValue("Action")
 			f.confInfo = ConfigFileInfo{
-					confName:			"",
-					confType:			"",
-					confCategory:	"",
-					fileName:		  "",
-					overwrite:		false,
-					status:				"OK",
-					ticker:				PROCESSINPUT_TICKER,
+				confName:     "",
+				confType:     "",
+				confCategory: "",
+				fileName:     "",
+				overwrite:    false,
+				status:       "OK",
+				ticker:       PROCESSINPUT_TICKER,
 			}
 
 			switch action {
-				case "add":
-					payload := pack.Message.GetPayload()
-					if value, exists := pack.Message.GetFieldValue("Overwrite"); exists {
-						field := pack.Message.FindFirstField("Overwrite")
-						valueType := field.GetValueType()
-						if valueType == message.Field_STRING {
-							f.confInfo.overwrite, _ = strconv.ParseBool(value.(string))
-						}
+			case "add":
+				payload := pack.Message.GetPayload()
+				if value, exists := pack.Message.GetFieldValue("Overwrite"); exists {
+					field := pack.Message.FindFirstField("Overwrite")
+					valueType := field.GetValueType()
+					if valueType == message.Field_STRING {
+						f.confInfo.overwrite, _ = strconv.ParseBool(value.(string))
 					}
-
-					tomlSection, _  := f.getDecodedToml(payload)
-
-					CONFIG:
-					for name, conf := range tomlSection {
-						f.confInfo.confName, f.confInfo.confType, f.confInfo.confCategory, f.confInfo.ticker = f.getConfigFileInfo(name, conf)
-						for _, confType := range f.conf.IncludeTypes {
-							if f.confInfo.confType == confType {
-								outBytes = []byte(f.addConfig(payload, f.confInfo))
-								continue CONFIG
-							}
-						}
-					}
-
-				case "delete":
-					if value, exists := pack.Message.GetFieldValue("Filename"); exists {
-						field := pack.Message.FindFirstField("Filename")
-						valueType := field.GetValueType()
-						if valueType == message.Field_STRING {
-								outBytes = []byte(f.removeConfig(value.(string)))
-						}
-					} else {
-						f.confInfo.status = "ERROR"
-						outBytes = []byte("You must specify a 'Filename' Field when deleting.")
-					}
-
-				case "return":
-					f.queueCursor = pack.queueCursor
-					for _, configPath := range f.includePaths {
-						err := f.sendConfigContents(configPath)
-						if err != nil {
-							fmt.Println(err)
-							f.pConfig.Globals.ShutDown(1)
-							break
-						}
-					}
-				default:
-					outBytes = []byte("ERROR Applying Configuration: You must supply an action(add, remove, return)")
 				}
-				f.outBatch = append(f.outBatch, outBytes...)
+
+				tomlSection, _ := f.getDecodedToml(payload)
+
+			CONFIG:
+				for name, conf := range tomlSection {
+					f.confInfo.confName, f.confInfo.confType, f.confInfo.confCategory, f.confInfo.ticker = f.getConfigFileInfo(name, conf)
+					for _, confType := range f.conf.IncludeTypes {
+						if f.confInfo.confType == confType {
+							outBytes = []byte(f.addConfig(payload, f.confInfo))
+							continue CONFIG
+						}
+					}
+				}
+
+			case "delete":
+				if value, exists := pack.Message.GetFieldValue("Filename"); exists {
+					field := pack.Message.FindFirstField("Filename")
+					valueType := field.GetValueType()
+					if valueType == message.Field_STRING {
+						outBytes = []byte(f.removeConfig(value.(string)))
+					}
+				} else {
+					f.confInfo.status = "ERROR"
+					outBytes = []byte("You must specify a 'Filename' Field when deleting.")
+				}
+
+			case "return":
 				f.queueCursor = pack.queueCursor
-				f.count++
-				if len(f.outBatch) > 0 {
-					f.sendBatch()
+				for _, configPath := range f.includePaths {
+					err := f.sendConfigContents(configPath)
+					if err != nil {
+						fmt.Println(err)
+						f.pConfig.Globals.ShutDown(1)
+						break
+					}
 				}
+			default:
+				outBytes = []byte("ERROR Applying Configuration: You must supply an action(add, remove, return)")
 			}
+			f.outBatch = append(f.outBatch, outBytes...)
+			f.queueCursor = pack.queueCursor
+			f.count++
+			if len(f.outBatch) > 0 {
+				f.sendBatch()
+			}
+		}
 
 	}
 }
@@ -255,8 +251,8 @@ func (f *CMFilter) committer(h PluginHelper) {
 	f.backChan <- make([]byte, 0, 10000)
 
 	var (
-	    b CMBatch
-      tag string
+		b   CMBatch
+		tag string
 	)
 	tag = f.conf.CMTag
 
@@ -295,9 +291,9 @@ func (f *CMFilter) committer(h PluginHelper) {
 		pack.Message.AddField(statusField)
 
 		tagField, _ := message.NewField("CMTag", tag, "")
-    pack.Message.AddField(tagField)
-    pack.Message.SetUuid(uuid.NewRandom())
-    pack.Message.SetPayload(string(b.batch))
+		pack.Message.AddField(tagField)
+		pack.Message.SetUuid(uuid.NewRandom())
+		pack.Message.SetPayload(string(b.batch))
 
 		f.fr.Inject(pack)
 		f.fr.UpdateCursor(b.queueCursor)
@@ -310,13 +306,13 @@ func (f *CMFilter) committer(h PluginHelper) {
 //BEGIN "add" Config methods
 func (f *CMFilter) addConfig(payload string, cfi ConfigFileInfo) (result string) {
 	var (
-		buffer bytes.Buffer
-		dup	= false
-		dir string
+		buffer      bytes.Buffer
+		dup         = false
+		dir         string
 		existingCFI ConfigFileInfo
 	)
 
- 	switch cfi.confType {
+	switch cfi.confType {
 	case "ProcessInput":
 		dir = filepath.Clean(f.conf.ProcessDir) + "/" + fmt.Sprint(cfi.ticker)
 	case "LogstreamerInput":
@@ -332,7 +328,7 @@ func (f *CMFilter) addConfig(payload string, cfi ConfigFileInfo) (result string)
 
 	randBytes := make([]byte, 16)
 	rand.Read(randBytes)
-	fName := "heka"+hex.EncodeToString(randBytes)+".toml"
+	fName := "heka" + hex.EncodeToString(randBytes) + ".toml"
 	confFile := filepath.Join(dir, fName)
 
 	//check for duplicate entries
@@ -340,7 +336,7 @@ func (f *CMFilter) addConfig(payload string, cfi ConfigFileInfo) (result string)
 	for _, file := range files {
 		existingFName := filepath.Join(dir, file.Name())
 		fileContents, _ := ReplaceEnvsFile(existingFName)
-		fileTomlConfig, _  := f.getDecodedToml(fileContents)
+		fileTomlConfig, _ := f.getDecodedToml(fileContents)
 		for name, conf := range fileTomlConfig {
 			existingCFI.confName, existingCFI.confType, existingCFI.confCategory, existingCFI.ticker = f.getConfigFileInfo(name, conf)
 
@@ -367,7 +363,7 @@ func (f *CMFilter) addConfig(payload string, cfi ConfigFileInfo) (result string)
 		f.confInfo.status = "ERROR"
 		return fmt.Sprintf("Failed due to error: %s", err.Error())
 	}
-	f.confInfo.fileName=confFile
+	f.confInfo.fileName = confFile
 	buffer.WriteString("Successfully updated configuation!")
 	return buffer.String()
 }
@@ -379,6 +375,7 @@ func (f *CMFilter) getDecodedToml(contents string) (configFile ConfigFile, err e
 	}
 	return configFile, err
 }
+
 //END "add" Config methods
 
 //BEGIN "remove" Config methods
@@ -396,7 +393,7 @@ func (f *CMFilter) removeConfig(fName string) (result string) {
 	if fi.IsDir() && f.confInfo.confType == "ProcessDirectoryInput" {
 		err := f.checkProcessTickerDir(fName)
 		if err != nil {
-		//Stay employed my friends...
+			//Stay employed my friends...
 			f.confInfo.status = "ERROR"
 			result = fmt.Sprintf("You cannot delete this directory: %s", fName)
 			return result
@@ -421,20 +418,19 @@ func (f *CMFilter) removeConfig(fName string) (result string) {
 		return result
 	}
 
-
 	//check if parent dir is now empty
 	empty, err := IsEmpty(parentDir)
 	//if so is it removable too?
 	if empty && f.confInfo.confType == "ProcessDirectoryInput" {
 		err = f.checkProcessTickerDir(parentDir)
 		if err == nil {
-				err = os.Remove(parentDir)
-				result = fmt.Sprintf("Successfully removed file: %s as well as empty process ticker directory: %s", fName, parentDir)
-				return result
+			err = os.Remove(parentDir)
+			result = fmt.Sprintf("Successfully removed file: %s as well as empty process ticker directory: %s", fName, parentDir)
+			return result
 		} else {
-				f.confInfo.status = "ERROR"
-				result = fmt.Sprintf("Successfully removed file: %s but failed to remove process ticker directory: %s", fName, parentDir)
-				return result
+			f.confInfo.status = "ERROR"
+			result = fmt.Sprintf("Successfully removed file: %s but failed to remove process ticker directory: %s", fName, parentDir)
+			return result
 		}
 	}
 
@@ -468,18 +464,19 @@ func (f *CMFilter) checkProcessTickerDir(fName string) (err error) {
 }
 
 func IsEmpty(name string) (bool, error) {
-    f, err := os.Open(name)
-    if err != nil {
-        return false, err
-    }
-    defer f.Close()
+	f, err := os.Open(name)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
 
-    _, err = f.Readdirnames(1) // Or f.Readdir(1)
-    if err == io.EOF {
-        return true, nil
-    }
-    return false, err // Either not empty or error, suits both cases
+	_, err = f.Readdirnames(1) // Or f.Readdir(1)
+	if err == io.EOF {
+		return true, nil
+	}
+	return false, err // Either not empty or error, suits both cases
 }
+
 //END "remove" Config methods
 
 //BEGIN "return" Action methods
@@ -504,10 +501,10 @@ func (f *CMFilter) getConfigFileInfo(name string, configFile toml.Primitive) (co
 func (f *CMFilter) sendConfigContents(configPath string) (err error) {
 	var (
 		confString string
-		ok				 bool
+		ok         bool
 		pluginType string
-    section  	 toml.Primitive
-	 )
+		section    toml.Primitive
+	)
 
 	outBytes := make([]byte, 0, 10000)
 
@@ -521,7 +518,7 @@ func (f *CMFilter) sendConfigContents(configPath string) (err error) {
 		return fmt.Errorf("can't stat file: " + err.Error())
 	}
 
-		//If path is directory, recursively walk it to find configs
+	//If path is directory, recursively walk it to find configs
 	if fi.IsDir() {
 		files := []string{}
 		filepath.Walk(configPath, func(path string, f os.FileInfo, err error) error {
@@ -529,41 +526,41 @@ func (f *CMFilter) sendConfigContents(configPath string) (err error) {
 			return nil
 		})
 
-		FILES:
-			for _, fName := range files {
-				if !strings.HasSuffix(fName, ".toml") {
-					// Skip non *.toml files in a config dir.
-					continue
-				}
+	FILES:
+		for _, fName := range files {
+			if !strings.HasSuffix(fName, ".toml") {
+				// Skip non *.toml files in a config dir.
+				continue
+			}
 
-				for _, excludePath := range f.conf.ExcludePaths {
-					if strings.HasPrefix(fName, excludePath) {
-						fmt.Printf("'%s' is under excludePath '%s'. Skipping.", fName, excludePath)
-						continue FILES
-					}
-				}
-
-				unparsedConfig := make(map[string]toml.Primitive)
-				confString, _ = ReplaceEnvsFile(fName)
-				_, err = toml.Decode(confString, &unparsedConfig)
-
-				for _, pluginType = range f.conf.IncludeTypes {
-					section, ok = unparsedConfig[pluginType]
-					if ok {
-							break
-					}
-				}
-				f.confInfo.confName, f.confInfo.confType, f.confInfo.confCategory, f.confInfo.ticker = f.getConfigFileInfo(pluginType, section)
-				f.confInfo.fileName = fName
-				outBytes = []byte(confString)
-				f.outBatch = append(f.outBatch, outBytes...)
-				f.count++
-				f.confInfo.status = "OK"
-
-				if len(f.outBatch) > 0 {
-					f.sendBatch()
+			for _, excludePath := range f.conf.ExcludePaths {
+				if strings.HasPrefix(fName, excludePath) {
+					fmt.Printf("'%s' is under excludePath '%s'. Skipping.", fName, excludePath)
+					continue FILES
 				}
 			}
+
+			unparsedConfig := make(map[string]toml.Primitive)
+			confString, _ = ReplaceEnvsFile(fName)
+			_, err = toml.Decode(confString, &unparsedConfig)
+
+			for _, pluginType = range f.conf.IncludeTypes {
+				section, ok = unparsedConfig[pluginType]
+				if ok {
+					break
+				}
+			}
+			f.confInfo.confName, f.confInfo.confType, f.confInfo.confCategory, f.confInfo.ticker = f.getConfigFileInfo(pluginType, section)
+			f.confInfo.fileName = fName
+			outBytes = []byte(confString)
+			f.outBatch = append(f.outBatch, outBytes...)
+			f.count++
+			f.confInfo.status = "OK"
+
+			if len(f.outBatch) > 0 {
+				f.sendBatch()
+			}
+		}
 	} else {
 		//Path is absolute location
 		if !strings.HasSuffix(configPath, ".toml") {
@@ -600,17 +597,15 @@ func (f *CMFilter) sendConfigContents(configPath string) (err error) {
 	}
 	return nil
 }
-//END "return" Action methods
 
+//END "return" Action methods
 
 func (f *CMFilter) CleanUp() {
 
 }
 
-
-
 func init() {
-    RegisterPlugin("CMFilter", func() interface{} {
-        return new(CMFilter)
-    })
+	RegisterPlugin("CMFilter", func() interface{} {
+		return new(CMFilter)
+	})
 }
