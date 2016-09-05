@@ -6,7 +6,7 @@ Configuration Management for [Heka](http://hekad.readthedocs.io/en/latest/)....u
 Occasionally there are circumstances where it may not always be possible to leverage the existing configuration management service(assuming there is one) for the environment in which you have deployed Heka.
 In this scenario it may be useful to have the ability to deliver and deploy new configurations using the Heka daemon itself.  
 This concept is similar to Splunk's [Deployment Architecture](http://docs.splunk.com/Documentation/Splunk/6.1.1/Updating/Deploymentserverarchitecture) which provides a centralized management interface for creating/removing/updating, distributing and applying data collection configurations to the edge "Forwarders".
-The CMFilter is intended to be used in conjunction with one or more *DirectoryInput plugin types.
+The CMFilter is intended to be used in conjunction with one or more *DirectoryInput plugin types in order to emulate that functionality.
 
 Currently supports:  
 [ProcessDirectoryInput](http://hekad.readthedocs.io/en/latest/config/inputs/processdir.html)  
