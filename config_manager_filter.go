@@ -69,7 +69,7 @@ type CMFilterConfig struct {
 	ProcessDir     string `toml:"process_dir"`
 	LogstreamerDir string `toml:"logstreamer_dir"`
 	HttpDir        string `toml:"http_dir"`
-	FilePolling    string `toml:"files_dir"`
+	FilePollingDir    string `toml:"files_dir"`
 
 	UseBuffering bool `toml:"use_buffering"`
 }
