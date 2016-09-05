@@ -68,7 +68,8 @@ type CMFilterConfig struct {
 	//Used for ProcessDirectoryInputs
 	ProcessDir     string `toml:"process_dir"`
 	LogstreamerDir string `toml:"logstreamer_dir"`
-	HttpDir				 string `toml:"http_dir"`
+	HttpDir        string `toml:"http_dir"`
+	FilePolling    string `toml:"files_dir"`
 
 	UseBuffering bool `toml:"use_buffering"`
 }
@@ -83,7 +84,7 @@ type MsgPack struct {
 func (f *CMFilter) ConfigStruct() interface{} {
 	return &CMFilterConfig{
 		CMTag:        "CM",
-		IncludeTypes: []string{"ProcessInput", "LogstreamerInput", "HttpInput"},
+		IncludeTypes: []string{"ProcessInput", "LogstreamerInput", "HttpInput", "FilePollingInput"},
 		UseBuffering: true,
 	}
 }
@@ -117,9 +118,14 @@ func (f *CMFilter) Prepare(fr FilterRunner, h PluginHelper) error {
 		f.conf.HttpDir = filepath.Join(f.shareDir, "http.d")
 	}
 
+	if f.conf.FilePollingDir == "" {
+		f.conf.FilePollingDir = filepath.Join(f.shareDir, "files.d")
+	}
+
 	f.includePaths = append(f.includePaths, f.conf.ProcessDir)
 	f.includePaths = append(f.includePaths, f.conf.LogstreamerDir)
 	f.includePaths = append(f.includePaths, f.conf.HttpDir)
+	f.includePaths = append(f.includePaths, f.conf.FilePollingDir)
 
 	var err error
 	f.outputBlock, err = NewRetryHelper(RetryOptions{
@@ -325,6 +331,8 @@ func (f *CMFilter) addConfig(payload string, cfi ConfigFileInfo) (result string)
 		dir = filepath.Clean(f.conf.LogstreamerDir)
 	case "HttpInput":
 		dir = filepath.Clean(f.conf.HttpDir)
+	case "FilePollingInput":
+		dir = filepath.Clean(f.conf.FilePollingDir)
 	default:
 		f.confInfo.status = "ERROR"
 		return fmt.Sprintf("Unable to determine configuration directory.")

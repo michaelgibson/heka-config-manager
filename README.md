@@ -12,6 +12,7 @@ Currently supports:
 [ProcessDirectoryInput](http://hekad.readthedocs.io/en/latest/config/inputs/processdir.html)  
 [LogstreamerDirectoryInput](https://github.com/michaelgibson/heka-logstreamer-directory-input)  
 [HttpDirectoryInput](https://github.com/michaelgibson/heka-http-directory-input)  
+[FilePollingDirectoryInput](https://github.com/michaelgibson/heka-file-polling-directory-input)  
 
 These plugin types are designed to monitor their respective directory structures for changes and dynamically load or unload config files based on changes.
 
